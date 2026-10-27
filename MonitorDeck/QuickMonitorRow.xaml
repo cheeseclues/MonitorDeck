@@ -1,0 +1,65 @@
+<UserControl x:Class="MonitorDeck.QuickMonitorRow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <Style TargetType="Slider">
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+            <Setter Property="TickFrequency" Value="1"/>
+            <Setter Property="SmallChange" Value="1"/>
+            <Setter Property="LargeChange" Value="5"/>
+        </Style>
+    </UserControl.Resources>
+    <Border Background="#192334" BorderBrush="#2A3B53" BorderThickness="1"
+            CornerRadius="10" Padding="11,7" Margin="0,0,0,6">
+        <StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock x:Name="MonitorName" Text="Monitor" FontWeight="SemiBold"
+                               FontSize="13" Foreground="#F3F7FF" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="MonitorMeta" Text="Graphics adapter" FontSize="10"
+                               Foreground="#829AB7" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                </StackPanel>
+                <Border x:Name="ModeBadge" Grid.Column="1" Background="#26364A"
+                        CornerRadius="6" Padding="7,4" VerticalAlignment="Top" Margin="7,0,0,0">
+                    <TextBlock x:Name="ModeText" Text="Checking" FontSize="10" Foreground="#BED0E9"/>
+                </Border>
+            </Grid>
+            <StackPanel x:Name="HardwareBrightnessSection" Margin="0,7,0,0" Visibility="Collapsed">
+                <Grid>
+                    <TextBlock Text="Hardware brightness" Foreground="#92C4FE" FontSize="11"/>
+                    <TextBlock x:Name="BrightnessValue" Text="—" HorizontalAlignment="Right"
+                               FontSize="11" Foreground="White"/>
+                </Grid>
+                <Slider x:Name="BrightnessSlider" Minimum="0" Maximum="100"
+                        ValueChanged="BrightnessSlider_OnValueChanged"/>
+            </StackPanel>
+            <StackPanel x:Name="HardwareContrastSection" Margin="0,7,0,0" Visibility="Collapsed">
+                <Grid>
+                    <TextBlock Text="Hardware contrast" Foreground="#DDA8F7" FontSize="11"/>
+                    <TextBlock x:Name="ContrastValue" Text="—" HorizontalAlignment="Right"
+                               FontSize="11" Foreground="White"/>
+                </Grid>
+                <Slider x:Name="ContrastSlider" Minimum="0" Maximum="100"
+                        ValueChanged="ContrastSlider_OnValueChanged"/>
+            </StackPanel>
+            <StackPanel x:Name="SoftwareBrightnessSection" Margin="0,7,0,0" Visibility="Collapsed">
+                <Grid>
+                    <TextBlock x:Name="SoftwareLabel" Text="Software dimming" Foreground="#88E3CC" FontSize="11"/>
+                    <TextBlock x:Name="SoftwareValue" Text="100%" HorizontalAlignment="Right"
+                               FontSize="11" Foreground="White"/>
+                </Grid>
+                <Slider x:Name="SoftwareSlider" Minimum="0" Maximum="100" Value="100"
+                        ToolTip="0% = black screen; Ctrl+Alt+Shift+F12 resets every dimming overlay"
+                        ValueChanged="SoftwareSlider_OnValueChanged"/>
+            </StackPanel>
+            <TextBlock x:Name="DetailText" Text="Checking hardware controls..."
+                       Foreground="#91A4BD" TextTrimming="CharacterEllipsis"
+                       FontSize="10" Margin="0,6,0,0"/>
+        </StackPanel>
+    </Border>
+</UserControl>

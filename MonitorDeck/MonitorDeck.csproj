@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <!-- Prevent WPF / Windows Forms / Drawing types from entering the global namespace. -->
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>MonitorDeck</AssemblyName>
+    <Version>1.0.25</Version>
+    <ApplicationIcon>Assets\MonitorDeck.ico</ApplicationIcon>
+    <RootNamespace>MonitorDeck</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\MonitorDeck.ico" />
+    <EmbeddedResource Include="Assets\MonitorDeck.ico" LogicalName="MonitorDeck.TrayIcon.ico" />
+  </ItemGroup>
+</Project>

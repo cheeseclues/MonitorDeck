@@ -1,0 +1,25 @@
+# Build outputs
+**/bin/
+**/obj/
+release/
+release-*/
+publish/
+*.msix
+*.msixbundle
+*.msixupload
+# IDE
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userosscache
+# Runtime logs and machine-specific data
+*.log
+software-dimming.json
+NightLightBackup/
+# Temporary files
+*.tmp
+*.bak
+Thumbs.db
+.DS_Store
