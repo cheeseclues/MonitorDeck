@@ -40,13 +40,7 @@ The workflow in `.github/workflows/windows-build.yml` compiles the project on a 
 
 Left-click the tray icon to toggle the compact popup. Use the popup to adjust each monitor and Windows Night Light, and the full view for diagnostics.
 
-**Clear dimming** removes every software overlay (sets it to 100%) and attempts these custom hardware presets when the displays are present and DDC/CI is responding:
-
-| Monitor | Brightness | Contrast |
-|---|---:|---:|
-| AOC Q27G4 | 100% | 50% |
-| Samsung Odyssey Neo G8 | 100% | 75% |
-| ASUS VX238 | 100% | 65% |
+**Clear dimming** removes every software overlay (sets it to 100%)
 
 The global emergency shortcut **Ctrl + Alt + Shift + F12** clears software dimming without changing hardware values, provided the hotkey is registered successfully. `Reset-Dimming.cmd` is included as a recovery aid. Be careful when setting a display to **0%** software brightness because it can become completely black.
 
