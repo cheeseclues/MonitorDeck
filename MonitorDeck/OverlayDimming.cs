@@ -60,14 +60,10 @@ internal sealed class OverlayDimming : IDisposable
                 IntPtr hwnd = form.IsHandleCreated ? form.Handle : IntPtr.Zero;
                 bool exists = hwnd != IntPtr.Zero && IsWindow(hwnd);
                 bool visible = exists && IsWindowVisible(hwnd);
-                bool affinityRead = exists && GetWindowDisplayAffinity(hwnd, out uint affinityValue);
-                // Assign a known value when GetWindowDisplayAffinity failed.
                 uint affinity = 0;
-                if (affinityRead)
-                    GetWindowDisplayAffinity(hwnd, out affinity);
-                bool rectRead = exists && NativeMethods.GetWindowRect(hwnd, out NativeMethods.RECT rectValue);
+                bool affinityRead = exists && GetWindowDisplayAffinity(hwnd, out affinity);
                 NativeMethods.RECT rect = default;
-                if (rectRead) NativeMethods.GetWindowRect(hwnd, out rect);
+                bool rectRead = exists && NativeMethods.GetWindowRect(hwnd, out rect);
                 int cloak = -1;
                 int dwmResult = exists ? DwmGetWindowAttribute(hwnd, DwmaCloaked,
                     out cloak, sizeof(int)) : -1;
@@ -150,6 +146,7 @@ internal sealed class OverlayDimming : IDisposable
     }
 
     private readonly Dictionary<string, DimForm> _forms = new(StringComparer.OrdinalIgnoreCase);
+    public int ActiveCount => _forms.Count;
     private readonly Dictionary<string, DateTime> _lastFailedRepair = new(StringComparer.OrdinalIgnoreCase);
 
     // Only retry a failed overlay after a pause. For example, some Windows
