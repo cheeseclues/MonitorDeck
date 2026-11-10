@@ -17,6 +17,80 @@ internal sealed class OverlayDimming : IDisposable
     private const int WmNcHitTest = 0x0084;
     private const int HtTransparent = -1;
 
+    private const uint GwHwndPrev = 3;
+    private const int DwmaCloaked = 14;
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindow(IntPtr hWnd, uint command);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hWnd,
+        System.Text.StringBuilder className, int maxCount);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr hWnd, int attribute,
+        out int value, int valueSize);
+
+    private static string WindowClass(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return "(none)";
+        var buffer = new System.Text.StringBuilder(128);
+        return GetClassName(hwnd, buffer, buffer.Capacity) == 0 ? "(unknown)" : buffer.ToString();
+    }
+
+    // Read-only snapshot. Deliberately does NOT call KeepAlive, SetWindowPos,
+    // or attempt a repair: diagnostics must capture the broken state first.
+    public string CaptureSnapshot(IReadOnlyList<DisplayInfo> displays,
+        IReadOnlyDictionary<string, int> requestedLevels)
+    {
+        var output = new System.Text.StringBuilder();
+        foreach (DisplayInfo display in displays)
+        {
+            int requested = requestedLevels.TryGetValue(display.Key, out int level) ? level : 100;
+            output.AppendLine($"{display.Name} ({display.DisplayPath}, model {display.HardwareId})");
+            output.AppendLine($"  Requested software brightness: {requested}%");
+            output.AppendLine($"  Expected bounds: {display.Left},{display.Top} {display.Width}x{display.Height}");
+            if (!_forms.TryGetValue(display.Key, out DimForm? form))
+            {
+                output.AppendLine("  Overlay: MISSING");
+                continue;
+            }
+            try
+            {
+                IntPtr hwnd = form.IsHandleCreated ? form.Handle : IntPtr.Zero;
+                bool exists = hwnd != IntPtr.Zero && IsWindow(hwnd);
+                bool visible = exists && IsWindowVisible(hwnd);
+                bool affinityRead = exists && GetWindowDisplayAffinity(hwnd, out uint affinityValue);
+                // Assign a known value when GetWindowDisplayAffinity failed.
+                uint affinity = 0;
+                if (affinityRead)
+                    GetWindowDisplayAffinity(hwnd, out affinity);
+                bool rectRead = exists && NativeMethods.GetWindowRect(hwnd, out NativeMethods.RECT rectValue);
+                NativeMethods.RECT rect = default;
+                if (rectRead) NativeMethods.GetWindowRect(hwnd, out rect);
+                int cloak = -1;
+                int dwmResult = exists ? DwmGetWindowAttribute(hwnd, DwmaCloaked,
+                    out cloak, sizeof(int)) : -1;
+                IntPtr previous = exists ? GetWindow(hwnd, GwHwndPrev) : IntPtr.Zero;
+                output.AppendLine($"  HWND: 0x{hwnd.ToInt64():X}; Exists={exists}; IsWindowVisible={visible}; Form.Visible={form.Visible}; Disposed={form.IsDisposed}");
+                output.AppendLine($"  Form.TopMost={form.TopMost}; Opacity={form.Opacity:F3}; Bounds={form.Bounds}");
+                output.AppendLine($"  Capture affinity: {(affinityRead ? $"0x{affinity:X}" : "unavailable")} (expected 0x11)");
+                output.AppendLine($"  Win32 bounds: {(rectRead ? $"{rect.Left},{rect.Top} {rect.Right - rect.Left}x{rect.Bottom - rect.Top}" : "unavailable")}");
+                output.AppendLine($"  DWM cloak: {(dwmResult == 0 ? cloak.ToString() : "unavailable")}; window immediately above: {WindowClass(previous)} (class only)");
+                if (!exists || !visible || !affinityRead || affinity != WdaExcludeFromCapture ||
+                    (dwmResult == 0 && cloak != 0))
+                    output.AppendLine("  WARNING: overlay has a detectable window-state issue");
+                else
+                    output.AppendLine("  Window APIs appear healthy; composition/z-order may still prevent visible dimming");
+            }
+            catch (Exception ex)
+            {
+                output.AppendLine("  Snapshot failed: " + ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+        return output.ToString();
+    }
+
     // A TV can renegotiate its HDMI link without Windows reporting a new
     // monitor fingerprint. A live overlay needs its own health check.
     [DllImport("user32.dll")]
@@ -135,6 +209,7 @@ internal sealed class OverlayDimming : IDisposable
                 }
             }
             _forms.Add(display.Key, form);
+            DimmingDiagnostics.Record($"Overlay created: {display.Name} {display.DisplayPath}, brightness={brightness}%, hwnd=0x{form.Handle.ToInt64():X}");
             return "Overlay active • capture exclusion requested; verify with OBS/Win+Shift+S.";
         }
         catch (Exception ex)
@@ -206,10 +281,12 @@ internal sealed class OverlayDimming : IDisposable
             {
                 _lastFailedRepair[display.Key] = DateTime.UtcNow;
                 notices.Add($"{display.Name}: repair failed ({issue}): {result}");
+                DimmingDiagnostics.Record($"Watchdog FAILED: {display.Name} {display.DisplayPath}, {issue}, {result}");
             }
             else
             {
                 notices.Add($"{display.Name}: restored {brightness}% software brightness ({issue})");
+                DimmingDiagnostics.Record($"Watchdog restored: {display.Name} {display.DisplayPath}, brightness={brightness}%, trigger={issue}");
             }
         }
         return notices;
@@ -237,6 +314,7 @@ internal sealed class OverlayDimming : IDisposable
     {
         if (_forms.Remove(key, out DimForm? form))
         {
+            DimmingDiagnostics.Record($"Overlay removed: key={key}, hwnd=0x{(form.IsHandleCreated ? form.Handle.ToInt64() : 0):X}");
             form.Close();
             form.Dispose();
         }
