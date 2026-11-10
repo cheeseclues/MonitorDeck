@@ -15,6 +15,7 @@ public partial class QuickPanel : Window
     internal event Action<DisplayInfo, int>? SoftwareRequested;
     internal event Action? RescanRequested;
     internal event Action? ClearDimmingRequested;
+    internal event Action? CopyDimmingDiagnosticsRequested;
     internal event Action? FullViewRequested;
     private bool _allowClose;
     private bool _updatingNightLight;
@@ -363,6 +364,8 @@ public partial class QuickPanel : Window
     private void CloseButton_OnClick(object sender, RoutedEventArgs e) => Hide();
     private void ClearDimmingButton_OnClick(object sender, RoutedEventArgs e)
         => ClearDimmingRequested?.Invoke();
+    private void CopyDimmingDiagnosticsButton_OnClick(object sender, RoutedEventArgs e)
+        => CopyDimmingDiagnosticsRequested?.Invoke();
     private void FullViewButton_OnClick(object sender, RoutedEventArgs e)
     {
         Hide();

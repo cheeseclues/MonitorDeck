@@ -27,6 +27,8 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, int> _softwareLevels = new(StringComparer.OrdinalIgnoreCase);
     private bool _gpuConsentShown;
     private bool _presetRunning;
+    private DateTime _lastOverlayHeartbeat = DateTime.MinValue;
+    private readonly Dictionary<string, (int Level, DateTime When)> _lastDimLog = new();
     private readonly Dictionary<string, MonitorCard> _cards = new();
     private readonly Dictionary<string, CancellationTokenSource> _pendingWrites = new();
     private readonly Dictionary<string, SemaphoreSlim> _monitorGates = new();
@@ -55,6 +57,7 @@ public partial class MainWindow : Window
         _quickPanel.SoftwareRequested += OnSoftwareDimRequested;
         _quickPanel.RescanRequested += ScheduleRescan;
         _quickPanel.ClearDimmingRequested += ClearDimming;
+        _quickPanel.CopyDimmingDiagnosticsRequested += CopyDimmingDiagnostics;
         _quickPanel.FullViewRequested += ShowMainWindow;
         // Re-anchor to the bottom of the taskbar screen as asynchronous probe
         // results add/remove slider sections and change the popup's height.
@@ -87,6 +90,7 @@ public partial class MainWindow : Window
         menu.Items.Add("Full monitor diagnostics", null, (_, _) => Dispatcher.Invoke(ShowMainWindow));
         menu.Items.Add("Rescan monitors", null, (_, _) => Dispatcher.Invoke(ScheduleRescan));
         menu.Items.Add("Reapply software dimming", null, (_, _) => Dispatcher.Invoke(ReapplySoftwareDimming));
+        menu.Items.Add("Copy dimming debug report", null, (_, _) => Dispatcher.Invoke(CopyDimmingDiagnostics));
         menu.Items.Add("Open diagnostics log", null, (_, _) =>
         {
             DiagnosticLog.Write("Diagnostics log opened");
@@ -227,6 +231,7 @@ public partial class MainWindow : Window
 
     private async void ClearDimming()
     {
+        DimmingDiagnostics.Record("User requested Clear dimming + hardware presets");
         if (_presetRunning)
         {
             _quickPanel.SetStatus("Full-brightness preset is still running...");
@@ -327,6 +332,7 @@ public partial class MainWindow : Window
     // overlay was set to 0% and the user cannot see the desktop.
     private void ClearSoftwareDimming()
     {
+        DimmingDiagnostics.Record("ClearSoftwareDimming: remove overlays and forget saved software levels");
         _dimming.Clear();
         _softwareLevels.Clear();
         _softwareSettings.Clear();
@@ -349,6 +355,16 @@ public partial class MainWindow : Window
         if (!_cards.TryGetValue(display.Key, out MonitorCard? card)) return;
         string message = _dimming.Set(card.Display, percent);
         bool failed = message.StartsWith("Overlay DISABLED", StringComparison.Ordinal);
+        // Log slider requests at most twice per second unless large changes or
+        // failures occur. This keeps the diagnostic log useful over long sessions.
+        DateTime when = DateTime.UtcNow;
+        if (failed || !_lastDimLog.TryGetValue(display.Key, out var last) ||
+            (when - last.When).TotalMilliseconds >= 500 ||
+            Math.Abs(percent - last.Level) >= 10)
+        {
+            DimmingDiagnostics.Record($"Slider: {card.Display.Name} {card.Display.DisplayPath} request={percent}% result={(failed ? "FAILED: " + message : "accepted")}");
+            _lastDimLog[display.Key] = (percent, when);
+        }
         int actual = failed ? 100 : percent;
         if (failed)
         {
@@ -520,8 +536,46 @@ public partial class MainWindow : Window
         }
     }
 
+    // Read-only snapshot: pressing Copy MUST NOT clear, recreate or raise
+    // overlays. Capture the failure before using Clear dimming.
+    private void CopyDimmingDiagnostics()
+    {
+        try
+        {
+            List<DisplayInfo> displays = DisplayEnumerator.GetActiveDisplays();
+            DimmingDiagnostics.Record("User requested a dimming snapshot");
+            var report = new System.Text.StringBuilder();
+            report.AppendLine("MonitorDeck software dimming diagnostic report");
+            report.AppendLine("Created (local): " + DateTimeOffset.Now.ToString("O"));
+            report.AppendLine("MonitorDeck version: " +
+                (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "unknown"));
+            report.AppendLine("Windows version: " + Environment.OSVersion.Version);
+            report.AppendLine("Active monitors: " + displays.Count);
+            report.AppendLine("Rescan busy: " + _scanBusy + "; popup visible: " + _quickPanel.IsVisible);
+            report.AppendLine();
+            report.AppendLine("OVERLAY STATE (read-only, no repair performed)");
+            report.Append(_dimming.CaptureSnapshot(displays, _softwareLevels));
+            report.AppendLine();
+            report.AppendLine("RECENT DIMMING EVENTS");
+            report.AppendLine(DimmingDiagnostics.RecentEvents());
+            report.AppendLine();
+            report.AppendLine("No window titles, user paths, passwords or screen contents are included.");
+            System.Windows.Clipboard.SetText(report.ToString());
+            _quickPanel.SetStatus("Dimming diagnostic report copied! Paste into ChatGPT.");
+            StatusText.Text = "Dimming diagnostic report copied to clipboard.";
+        }
+        catch (Exception ex)
+        {
+            string error = "Could not copy diagnostics: " + ex.Message;
+            _quickPanel.SetStatus(error);
+            StatusText.Text = error;
+            DiagnosticLog.Write("Dimming diagnostics copy failed: " + ex.GetType().Name);
+        }
+    }
+
     private void ReapplySoftwareDimming()
     {
+        DimmingDiagnostics.Record("Manual overlay reapply requested");
         // Manual recovery option for TVs that switch into a composition mode
         // where an apparently healthy overlay is not actually rendered.
         // Do not erase preferences or touch hardware brightness / Night Light.
@@ -550,6 +604,13 @@ public partial class MainWindow : Window
         foreach (string message in _dimming.KeepAlive(displays, _softwareLevels))
         {
             DiagnosticLog.Write("Overlay watchdog: " + message);
+        }
+        if (DateTime.UtcNow - _lastOverlayHeartbeat >= TimeSpan.FromMinutes(1))
+        {
+            _lastOverlayHeartbeat = DateTime.UtcNow;
+            int requested = displays.Count(d =>
+                _softwareLevels.TryGetValue(d.Key, out int value) && value < 100);
+            DimmingDiagnostics.Record($"Watchdog heartbeat: displays={displays.Count}; requested dimming={requested}; overlay forms={_dimming.ActiveCount}");
         }
 
         // Refreshing an overlay's topmost position must not obscure our tray

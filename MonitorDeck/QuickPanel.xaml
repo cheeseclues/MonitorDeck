@@ -137,6 +137,10 @@
             <Border x:Name="FooterBorder" Grid.Row="3" Background="#151F2E" CornerRadius="0,0,14,14"
                     BorderBrush="#2A3A50" BorderThickness="0,1,0,0" Padding="12,10">
                 <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -145,12 +149,15 @@
                         <Button Content="Clear dimming" FontSize="11" Padding="9,6"
                                 ToolTip="Set all software dimming to 100% and restore AOC (100/50), Neo G8 (100/75), ASUS VX (100/65). Emergency Ctrl+Alt+Shift+F12 clears overlays only."
                                 Click="ClearDimmingButton_OnClick"/>
-                        <TextBlock x:Name="StatusText" Text="Ready" FontSize="10"
-                                   Foreground="#8CA0BB" Margin="9,0,0,0"
-                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                        <Button Content="Copy debug" FontSize="11" Padding="9,6" Margin="7,0,0,0"
+                                ToolTip="Copy current software overlay state and recent dimming events. Click BEFORE Clear dimming when a monitor gets stuck."
+                                Click="CopyDimmingDiagnosticsButton_OnClick"/>
                     </StackPanel>
                     <Button Grid.Column="1" Content="Full view ↗" FontSize="11" Padding="9,6"
                             Click="FullViewButton_OnClick"/>
+                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" x:Name="StatusText" Text="Ready" FontSize="10"
+                               Foreground="#8CA0BB" Margin="0,6,0,0"
+                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                 </Grid>
             </Border>
         </Grid>
