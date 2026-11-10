@@ -2,7 +2,7 @@
 
 A lightweight Windows 11 tray application for multi-monitor brightness and contrast controls.
 
-**Current source version: v1.0.25 — experimental / personal-project preview.** This project is under active development and is not a Microsoft Store application or a signed release.
+**Current source version: v1.0.26 — experimental diagnostic preview.** This project is under active development and is not a Microsoft Store application or a signed release.
 
 ## Features
 
@@ -43,6 +43,14 @@ Left-click the tray icon to toggle the compact popup. Use the popup to adjust ea
 **Clear dimming** removes every software overlay (sets it to 100%)
 
 The global emergency shortcut **Ctrl + Alt + Shift + F12** clears software dimming without changing hardware values, provided the hotkey is registered successfully. `Reset-Dimming.cmd` is included as a recovery aid. Be careful when setting a display to **0%** software brightness because it can become completely black.
+
+## Diagnosing intermittent software dimming
+
+If a screen becomes bright even though its software brightness slider shows a low percentage, **do not click Clear dimming yet**. Instead, open the tray popup and click **Copy debug**, or right-click the tray icon and choose **Copy dimming debug report**. Paste the copied report into a bug report or ChatGPT. Then use Clear dimming to recover.
+
+The report includes each active display's requested software brightness, overlay HWND health, native visibility, position, opacity, capture-exclusion state, DWM cloak state, and the class of the window immediately above it in z-order. It also includes recent dimming/repair events recorded across the current session. These diagnostics are **read-only** and do not reposition, restart or clear any overlay.
+
+The report deliberately omits window titles, user file paths, screenshots, credentials and Night Light registry data. The existing `%LOCALAPPDATA%\MonitorDeck\diagnostics.log` keeps tagged dimming events across sessions; the Copy debug action selects only those tagged events. **Only share the copied report after reviewing it.** The normal `Open diagnostics log` command still opens the full, unfiltered local log.
 
 ## Known limitations and caveats
 
