@@ -2,7 +2,7 @@
 
 A lightweight Windows 11 tray application for multi-monitor brightness and contrast controls.
 
-**Current source version: v1.0.26 — experimental diagnostic preview.** This project is under active development and is not a Microsoft Store application or a signed release.
+**Current source version: v1.0.27 — experimental diagnostic preview.** This project is under active development and is not a Microsoft Store application or a signed release.
 
 ## Features
 
@@ -22,7 +22,22 @@ Requires **Windows 11**, **.NET 10 SDK**, and a Windows x64 environment for the 
 
 1. Clone or download the repository.
 2. Run `Build-Release.cmd` from the repository root.
-3. Launch `release\MonitorDeck.exe`.
+3. After publishing succeeds, approve Windows' UAC prompt if MonitorDeck needs to update its all-users startup installation.
+4. Exit any old MonitorDeck instance and launch `release\MonitorDeck.exe`, or sign out and back in to let the new version start automatically.
+
+### Automatic startup after building (local Windows builds only)
+
+`Build-Release.cmd` now installs **the exact successful build** for automatic startup at the next sign-in of any Windows account. It uses a special install-only command, which requests Windows administrator approval when required. If you cancel UAC or the install fails, **the build is still successful**, but the existing startup entry remains unchanged; the script displays a warning.
+
+To avoid stale same-version installs, MonitorDeck copies the executable to a fingerprinted name such as `C:\Program Files\MonitorDeck\MonitorDeck-v1.0.27-ABC123ABC123.exe` and updates `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\MonitorDeck` to that path. Previous installed versions are retained rather than deleted automatically. A version that is already running will **not** be forcibly terminated; exit the old tray app and launch the new build, or sign out and back in to switch to the newly registered version.
+
+To check the registered executable, run in PowerShell:
+
+```powershell
+Get-ItemPropertyValue -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -Name MonitorDeck
+```
+
+Building through `dotnet publish` alone, `Run-Dev.cmd`, or GitHub Actions **does not** change the startup setting; only the local `Build-Release.cmd` performs installation.
 
 The build produces a **self-contained Windows x64 executable**. Because it bundles .NET and WPF runtime components, it can be substantially larger than the source code.
 
