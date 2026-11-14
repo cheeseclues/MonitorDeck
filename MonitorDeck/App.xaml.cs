@@ -21,6 +21,19 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // Called only by Build-Release.cmd after a successful publish.
+        // Check if the exact build is already installed; request UAC only when
+        // a new executable must be registered for all Windows accounts.
+        // Handle it before taking the per-session single-instance mutex:
+        // an older MonitorDeck instance may still be running.
+        if (Array.Exists(e.Args, arg => string.Equals(arg,
+                "--ensure-all-users-startup", StringComparison.OrdinalIgnoreCase)))
+        {
+            bool succeeded = StartupRegistration.RequestInstallWithUac(out _);
+            Shutdown(succeeded ? 0 : 1);
+            return;
+        }
+
         // HKLM Run launches once per signing-in Windows user. Avoid a duplicate
         // tray icon if that user also launches MonitorDeck manually.
         _sessionMutex = new Mutex(false, @"Local\MonitorDeck.SingleInstance", out bool firstInstance);
