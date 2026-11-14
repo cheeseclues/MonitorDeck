@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Security.Cryptography;
 using Microsoft.Win32;
 
 namespace MonitorDeck;
@@ -19,16 +20,28 @@ internal static class StartupRegistration
     private static string InstallDirectory =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "MonitorDeck");
 
-    // Versioned EXE: a new version can be installed while an older version
-    // is still running; the Run entry is then atomically pointed at the new EXE.
+    // Version AND build fingerprint: a changed build is installed under a
+    // different file name even if the .csproj version was not incremented.
+    // This also allows an old version to keep running until sign-out while
+    // Windows startup is safely switched to the new executable.
     private static string InstallPath
     {
         get
         {
             Version version = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 0, 10);
+            string? exe = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(exe) || !File.Exists(exe))
+                throw new FileNotFoundException("The running MonitorDeck executable is unavailable.");
+            string fingerprint = Convert.ToHexString(FileHash(exe).AsSpan(0, 6));
             return Path.Combine(InstallDirectory,
-                $"MonitorDeck-v{version.Major}.{version.Minor}.{version.Build}.exe");
+                $"MonitorDeck-v{version.Major}.{version.Minor}.{version.Build}-{fingerprint}.exe");
         }
+    }
+
+    private static byte[] FileHash(string path)
+    {
+        using FileStream stream = File.OpenRead(path);
+        return SHA256.HashData(stream);
     }
 
     private static string Command => $"\"{InstallPath}\" --autostart";
@@ -64,8 +77,21 @@ internal static class StartupRegistration
             }
 
             Directory.CreateDirectory(InstallDirectory);
-            if (!Path.GetFullPath(exe).Equals(Path.GetFullPath(InstallPath), StringComparison.OrdinalIgnoreCase))
-                File.Copy(exe, InstallPath, overwrite: true);
+            string destination = InstallPath;
+            if (!Path.GetFullPath(exe).Equals(Path.GetFullPath(destination), StringComparison.OrdinalIgnoreCase))
+            {
+                // Never overwrite a running executable or overwrite an existing
+                // file of different contents under the same fingerprinted name.
+                if (File.Exists(destination))
+                {
+                    if (!FileHash(exe).AsSpan().SequenceEqual(FileHash(destination)))
+                        throw new IOException("The installed MonitorDeck copy differs from the new build.");
+                }
+                else
+                {
+                    File.Copy(exe, destination, overwrite: false);
+                }
+            }
 
             using RegistryKey machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
             using RegistryKey run = machine.CreateSubKey(RunKey, writable: true)
